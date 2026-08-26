@@ -2,7 +2,7 @@
 
 from std.testing import assert_equal, assert_true, assert_false, TestSuite
 
-from sha256.core import Backend, _hex
+from sha256.core import Backend, arm_backend_available, _hex
 from sha256.rfc6979 import Rfc6979
 from tests.vec import hex_to_bytes, load
 
@@ -19,12 +19,13 @@ def test_known_vectors() raises:
 
 
 def test_backends_agree() raises:
-    for r in load("RFC6979"):
-        var seed = hex_to_bytes(r.arg(0))
-        var a = Rfc6979[Backend.PORTABLE](seed)
-        var b = Rfc6979[Backend.ARM](seed)
-        for _ in range(3):
-            assert_equal(_hex(a.generate()), _hex(b.generate()))
+    comptime if arm_backend_available():
+        for r in load("RFC6979"):
+            var seed = hex_to_bytes(r.arg(0))
+            var a = Rfc6979[Backend.PORTABLE](seed)
+            var b = Rfc6979[Backend.ARM](seed)
+            for _ in range(3):
+                assert_equal(_hex(a.generate()), _hex(b.generate()))
 
 
 def test_deterministic() raises:

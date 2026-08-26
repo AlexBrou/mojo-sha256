@@ -8,11 +8,17 @@ and `sha256su0`/`sha256su1` between them compute four message-schedule words.
 There is no LLVM documentation page for these; `IntrinsicsAArch64.td` in the
 LLVM tree is the authoritative definition.
 
-Availability: the extension is optional in ARMv8-A, but present on every Apple
-silicon part, AWS Graviton, and essentially all server-class ARM. Mojo exposes
-no `has_sha2()` predicate, so `core.mojo` selects this backend on `has_neon()`
-— which is really a proxy for aarch64. If you hit a target that has NEON but
-not the crypto extension, force the portable backend; see `core.mojo`.
+Availability: the extension is optional in ARMv8-A. It is present on every
+Apple silicon part, on AWS Graviton, and on essentially all server-class ARM —
+but what matters is whether the *compilation target* advertises it, not whether
+the CPU has it. On a generic aarch64 target (a Debian arm64 container, say)
+emitting these intrinsics aborts the compiler with
+
+    LLVM ERROR: Cannot select: intrinsic %llvm.aarch64.crypto.sha256h
+
+so `core.mojo` only selects this backend automatically on Apple silicon, where
+the target always includes it. To use it elsewhere, pin `Backend.ARM` and build
+for a CPU that advertises the extension (`-mcpu=neoverse-n1` and similar).
 """
 
 from std.bit import byte_swap

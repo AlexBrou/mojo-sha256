@@ -7,7 +7,7 @@ nothing — which is easy to miss, because the result looks spectacular.
 
 from std.time import perf_counter_ns
 
-from sha256.core import Backend, Sha256, sha256
+from sha256.core import Backend, Sha256, arm_backend_available, sha256
 from sha256.constants import Digest
 
 
@@ -66,8 +66,11 @@ def main() raises:
         print(_pad("message size: " + String(msg_len) + " bytes", 30))
         var iters = 200000 if msg_len <= 64 else 20000
         var p = bench_cpu[Backend.PORTABLE]("CPU portable", msg_len, iters)
-        var a = bench_cpu[Backend.ARM]("CPU ARMv8 SHA-2", msg_len, iters)
-        if p > 0 and a > 0:
-            var ratio = Float64(p) / Float64(a)
-            print("  " + _pad("ARM speedup", 22) + String(ratio) + "x")
+        comptime if arm_backend_available():
+            var a = bench_cpu[Backend.ARM]("CPU ARMv8 SHA-2", msg_len, iters)
+            if p > 0 and a > 0:
+                var ratio = Float64(p) / Float64(a)
+                print("  " + _pad("ARM speedup", 22) + String(ratio) + "x")
+        else:
+            print("  (ARM backend not available on this target)")
         print()

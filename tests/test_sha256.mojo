@@ -2,7 +2,7 @@
 
 from std.testing import assert_equal, assert_true, TestSuite
 
-from sha256.core import Backend, Sha256, sha256, _hex
+from sha256.core import Backend, Sha256, arm_backend_available, sha256, _hex
 from tests.vec import hex_to_bytes, load
 
 
@@ -19,9 +19,11 @@ def test_known_vectors_portable() raises:
 
 
 def test_known_vectors_arm() raises:
-    # Skipped by the compiler on a target without NEON: the ARM backend would
-    # not build there. On aarch64 this is the important one.
-    comptime if Backend.ARM == Backend.ARM:
+    # Compiled away entirely where the ARM backend cannot be built. Emitting
+    # the crypto intrinsics on a target that does not advertise the extension
+    # aborts the compiler, so this has to be a compile-time branch rather than
+    # a runtime skip.
+    comptime if arm_backend_available():
         for r in load("SHA256"):
             var msg = hex_to_bytes(r.arg(0))
             assert_equal(_hex(sha256[Backend.ARM](msg)), r.arg(1))
@@ -29,12 +31,13 @@ def test_known_vectors_arm() raises:
 
 def test_backends_agree() raises:
     """The whole point of having two: they must be indistinguishable."""
-    for r in load("SHA256"):
-        var msg = hex_to_bytes(r.arg(0))
-        assert_equal(
-            _hex(sha256[Backend.PORTABLE](msg)),
-            _hex(sha256[Backend.ARM](msg)),
-        )
+    comptime if arm_backend_available():
+        for r in load("SHA256"):
+            var msg = hex_to_bytes(r.arg(0))
+            assert_equal(
+                _hex(sha256[Backend.PORTABLE](msg)),
+                _hex(sha256[Backend.ARM](msg)),
+            )
 
 
 def test_streaming_matches_one_shot() raises:

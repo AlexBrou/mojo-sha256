@@ -6,7 +6,7 @@ the only thing that decides whether it is worth using.
 
 from std.time import perf_counter_ns
 
-from sha256.core import Backend, Sha256
+from sha256.core import Backend, Sha256, arm_backend_available
 from sha256.gpu import GpuHasher
 
 
@@ -58,15 +58,16 @@ def main() raises:
                 best_p = ns
 
         var best_a = 0
-        for r in range(3):
-            var t0 = perf_counter_ns()
-            for i in range(count):
-                var h = Sha256[Backend.ARM]()
-                h.write(Span(data)[i * L : (i + 1) * L])
-                sink += UInt64(h.digest()[0])
-            var ns = perf_counter_ns() - t0
-            if r == 0 or ns < best_a:
-                best_a = ns
+        comptime if arm_backend_available():
+            for r in range(3):
+                var t0 = perf_counter_ns()
+                for i in range(count):
+                    var h = Sha256[Backend.ARM]()
+                    h.write(Span(data)[i * L : (i + 1) * L])
+                    sink += UInt64(h.digest()[0])
+                var ns = perf_counter_ns() - t0
+                if r == 0 or ns < best_a:
+                    best_a = ns
 
         var best_g = 0
         for r in range(3):

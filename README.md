@@ -14,8 +14,11 @@ hardware-accelerated CPU backend on ARM and an experimental GPU backend.
 
 ### Status
 
-**There is no x86 backend.** On x86 you get the portable implementation, which
-is correct and tested but roughly 6x slower than what SHA-NI could do. Writing
+**Only Apple silicon gets the hardware backend automatically.** Everywhere
+else — x86, and aarch64 targets that do not advertise the crypto extension —
+you get the portable implementation, which is correct and tested but roughly 6x
+slower. Linux ARM can opt in; see [Backends](#backends). There is no x86 SHA-NI
+backend at all. Writing
 one is not hard — it would mirror `arm.mojo` using `llvm.x86.sha256rnds2` and
 friends — but there is no x86 machine here to verify it on, and an unverified
 crypto backend is worse than none. See [Backends](#backends).
@@ -159,14 +162,28 @@ var auto     = Sha256[Backend.AUTO]()      # the default
 | Backend | Where it runs | Notes |
 |---|---|---|
 | `PORTABLE` | anywhere, including GPU kernels | unrolled, 16-word rolling schedule |
-| `ARM` | aarch64 with the SHA-2 crypto extension | `sha256h`, `sha256h2`, `sha256su0/1` |
-| `AUTO` | picks `ARM` where `has_neon()`, else `PORTABLE` | the default |
+| `ARM` | aarch64 targets that advertise the SHA-2 crypto extension | `sha256h`, `sha256h2`, `sha256su0/1` |
+| `AUTO` | `ARM` on Apple silicon, else `PORTABLE` | the default |
 
-Two caveats on selection. Mojo exposes no `has_sha2()` predicate, so `AUTO`
-uses `has_neon()` as a proxy for aarch64. The crypto extension is optional in
-ARMv8-A, though present on all Apple silicon, AWS Graviton and essentially all
-server-class ARM. If you hit a target with NEON but no crypto extension, pin
-`Backend.PORTABLE`.
+**`AUTO` only selects `ARM` on Apple silicon**, and deliberately so. What
+matters is not whether the CPU has the crypto extension but whether the
+*compilation target* advertises it — and if it does not, emitting the intrinsic
+does not fall back or run slowly, it aborts the compiler:
+
+```
+LLVM ERROR: Cannot select: intrinsic %llvm.aarch64.crypto.sha256h
+```
+
+That is what a generic aarch64 target does, a Debian arm64 container being the
+easy way to hit it. Mojo exposes no `has_sha2()` predicate, and `has_neon()` is
+true there, so Apple silicon — where the extension is always part of the target
+— is the only case that can be selected safely without one.
+
+Other ARM parts that do have it (Graviton, most server-class aarch64) can opt in
+by pinning `Backend.ARM`, provided the build targets a CPU that advertises the
+extension. `arm_backend_available()` reports whether that is the case for the
+current target; gate on it with `comptime if` if you want conditional use, since
+a runtime check would still have compiled the intrinsic.
 
 **There is no x86 SHA-NI backend.** On x86, `AUTO` resolves to `PORTABLE`:
 correct, tested in CI on `ubuntu-24.04`, and roughly 6x slower than the ARM

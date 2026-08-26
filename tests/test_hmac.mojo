@@ -2,7 +2,7 @@
 
 from std.testing import assert_equal, assert_true, TestSuite
 
-from sha256.core import Backend, _hex
+from sha256.core import Backend, arm_backend_available, _hex
 from sha256.hmac import HmacSha256, hmac_sha256
 from tests.vec import hex_to_bytes, load
 
@@ -15,13 +15,14 @@ def test_known_vectors() raises:
 
 
 def test_backends_agree() raises:
-    for r in load("HMAC"):
-        var key = hex_to_bytes(r.arg(0))
-        var data = hex_to_bytes(r.arg(1))
-        assert_equal(
-            _hex(hmac_sha256[Backend.PORTABLE](key, data)),
-            _hex(hmac_sha256[Backend.ARM](key, data)),
-        )
+    comptime if arm_backend_available():
+        for r in load("HMAC"):
+            var key = hex_to_bytes(r.arg(0))
+            var data = hex_to_bytes(r.arg(1))
+            assert_equal(
+                _hex(hmac_sha256[Backend.PORTABLE](key, data)),
+                _hex(hmac_sha256[Backend.ARM](key, data)),
+            )
 
 
 def test_long_key_is_hashed_first() raises:

@@ -33,11 +33,39 @@ struct Backend:
 
 @always_inline
 def _resolve[backend: Int]() -> Int:
+    """Which backend `AUTO` means on this target.
+
+    Apple silicon is the only aarch64 target selected automatically, because it
+    is the only one where the SHA-2 crypto extension is guaranteed to be part
+    of the compilation target.
+
+    `has_neon()` is NOT a sufficient test, and using it was a bug: it is true on
+    a generic aarch64 target — a Debian arm64 container, for instance — where
+    the crypto extension is not enabled. Emitting the intrinsic there does not
+    fall back or produce a slow path, it fails instruction selection and
+    **aborts the compiler**:
+
+        LLVM ERROR: Cannot select: intrinsic %llvm.aarch64.crypto.sha256h
+
+    Other ARM parts that do have the extension (Graviton, most server-class
+    aarch64) can opt in by pinning `Backend.ARM`, provided the build targets a
+    CPU that advertises it — `-mcpu=neoverse-n1` or similar. See `arm.mojo`.
+    """
     comptime if backend != Backend.AUTO:
         return backend
-    comptime if CompilationTarget.has_neon():
+    comptime if CompilationTarget.is_apple_silicon():
         return Backend.ARM
     return Backend.PORTABLE
+
+
+@always_inline
+def arm_backend_available() -> Bool:
+    """Whether `Backend.ARM` can be compiled for this target.
+
+    Pinning `Backend.ARM` where this is False aborts the compiler rather than
+    failing gracefully, so tests and any conditional use should gate on it.
+    """
+    return CompilationTarget.is_apple_silicon()
 
 
 struct Sha256[backend: Int = Backend.AUTO](Copyable, Movable):
