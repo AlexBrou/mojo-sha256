@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A push that supersedes an in-flight run cancels it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ARM, so the ARMv8 crypto-extension backend is actually exercised.
+          - name: linux-arm64
+            runner: ubuntu-24.04-arm
+          # x86, where AUTO falls back to the portable backend. Both must pass.
+          - name: linux-x64
+            runner: ubuntu-24.04
+          - name: macos-arm64
+            runner: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pixi
+        uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+          cache: true
+
+      - name: Show toolchain
+        run: pixi run mojo --version
+
+      # No GPU on any hosted runner, so the GPU tests are skipped. They are
+      # covered locally; see the README.
+      - name: Run tests
+        env:
+          SHA256_SKIP_GPU: "1"
+        run: ./run_tests.sh
+
+  format:
+    name: format and lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pixi
+        uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+          cache: true
+
+      # Fails if anything differs from what `mojo format` would write.
+      - name: Check formatting
+        run: ./tools/check_format.sh
+
+      # The compiler is the linter: warnings that matter (unused assignments,
+      # deprecated APIs) show up here, and this turns them into a failure.
+      - name: Check for compiler warnings
+        run: ./tools/check_warnings.sh
+
+  build:
+    name: build the package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+          cache: true
+
+      # Precompiling catches anything that only breaks when the package is
+      # consumed as a unit rather than compiled per-file.
+      - name: Precompile
+        run: pixi run mojo precompile src/sha256 -o sha256.mojopkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sha256-mojopkg
+          path: sha256.mojopkg
+          retention-days: 7

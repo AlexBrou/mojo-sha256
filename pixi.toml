@@ -1,0 +1,16 @@
+[workspace]
+authors = ["Alex Brou"]
+channels = ["https://conda.modular.com/max", "conda-forge"]
+name = "mojo-sha256"
+platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
+version = "0.1.0"
+
+[tasks]
+test = "./run_tests.sh"
+bench = "mojo run -I src -I . bench/bench.mojo"
+format = "mojo format src/sha256 tests bench"
+format-check = "./tools/check_format.sh"
+
+[dependencies]
+mojo = ">=1.0.0,<2"
+max = ">=26.5.0,<27"
