@@ -70,7 +70,7 @@ def compress(mut state: State, block: Block):
     # See the note in portable.mojo: an explicit byte_swap rather than the
     # big_endian flag, so both backends load blocks the same way.
     var wv = byte_swap(SIMD[DType.uint32, 16].from_bytes(block))
-    var s = InlineArray[W, 4](uninitialized=True)
+    var s = Array[W, 4](uninitialized=True)
     comptime for v in range(4):
         s[v] = wv.slice[4, offset=v * 4]()
 

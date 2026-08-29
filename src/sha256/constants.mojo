@@ -2,7 +2,7 @@
 
 # FIPS 180-4 section 4.2.2: the first 32 bits of the fractional parts of the
 # cube roots of the first 64 primes.
-comptime K: InlineArray[UInt32, 64] = [
+comptime K: Array[UInt32, 64] = [
     0x428A2F98,
     0x71374491,
     0xB5C0FBCF,
@@ -73,8 +73,8 @@ comptime BLOCK_SIZE = 64
 comptime DIGEST_SIZE = 32
 
 comptime State = SIMD[DType.uint32, 8]
-comptime Block = InlineArray[UInt8, BLOCK_SIZE]
-comptime Digest = InlineArray[UInt8, DIGEST_SIZE]
+comptime Block = Array[UInt8, BLOCK_SIZE]
+comptime Digest = Array[UInt8, DIGEST_SIZE]
 
 
 @always_inline

@@ -20,21 +20,21 @@ struct Rfc6979[backend: Int = Backend.AUTO](Copyable, Movable):
     Nothing here allocates: the state is two fixed 32-byte arrays.
     """
 
-    var v: InlineArray[UInt8, DIGEST_SIZE]
-    var k: InlineArray[UInt8, DIGEST_SIZE]
+    var v: Array[UInt8, DIGEST_SIZE]
+    var k: Array[UInt8, DIGEST_SIZE]
     var retry: Bool
 
     def __init__(out self, key: Span[UInt8, _]):
         # 3.2.b and 3.2.c
-        self.v = InlineArray[UInt8, DIGEST_SIZE](fill=0x01)
-        self.k = InlineArray[UInt8, DIGEST_SIZE](fill=0x00)
+        self.v = Array[UInt8, DIGEST_SIZE](fill=0x01)
+        self.k = Array[UInt8, DIGEST_SIZE](fill=0x00)
         self.retry = False
         # 3.2.d and 3.2.f
         self._update(0x00, key, True)
         self._update(0x01, key, True)
 
     def _update(mut self, sep: UInt8, key: Span[UInt8, _], with_key: Bool):
-        var sep_arr = InlineArray[UInt8, 1](fill=sep)
+        var sep_arr = Array[UInt8, 1](fill=sep)
         var h = HmacSha256[Self.backend](self.k)
         h.write(self.v)
         h.write(sep_arr)
@@ -48,7 +48,7 @@ struct Rfc6979[backend: Int = Backend.AUTO](Copyable, Movable):
     def generate(mut self) -> Digest:
         """The next 32 bytes of output (RFC 6979 section 3.2.h)."""
         if self.retry:
-            var empty = InlineArray[UInt8, 1](fill=0)
+            var empty = Array[UInt8, 1](fill=0)
             self._update(0x00, Span(empty)[0:0], False)
         var h = HmacSha256[Self.backend](self.k)
         h.write(self.v)

@@ -27,7 +27,7 @@ def compress(mut state: State, block: Block):
     # operation and behaves the same on both. (Both targets are little-endian,
     # which is what makes the swap the right direction here.)
     var wv = byte_swap(SIMD[DType.uint32, 16].from_bytes(block))
-    var w = InlineArray[UInt32, 16](uninitialized=True)
+    var w = Array[UInt32, 16](uninitialized=True)
     comptime for i in range(16):
         w[i] = wv[i]
 

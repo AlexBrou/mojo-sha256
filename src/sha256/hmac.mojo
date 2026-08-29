@@ -19,7 +19,7 @@ struct HmacSha256[backend: Int = Backend.AUTO](Copyable, Movable):
     def __init__(out self, key: Span[UInt8, _]):
         # RFC 2104: keys longer than the block size are hashed first, shorter
         # ones are zero-padded.
-        var rkey = InlineArray[UInt8, BLOCK_SIZE](fill=0)
+        var rkey = Array[UInt8, BLOCK_SIZE](fill=0)
         if len(key) > BLOCK_SIZE:
             var kh = Sha256[Self.backend]()
             kh.write(key)
@@ -30,8 +30,8 @@ struct HmacSha256[backend: Int = Backend.AUTO](Copyable, Movable):
             for i in range(len(key)):
                 rkey[i] = key[i]
 
-        var ipad = InlineArray[UInt8, BLOCK_SIZE](fill=0)
-        var opad = InlineArray[UInt8, BLOCK_SIZE](fill=0)
+        var ipad = Array[UInt8, BLOCK_SIZE](fill=0)
+        var opad = Array[UInt8, BLOCK_SIZE](fill=0)
         for i in range(BLOCK_SIZE):
             ipad[i] = rkey[i] ^ 0x36
             opad[i] = rkey[i] ^ 0x5C

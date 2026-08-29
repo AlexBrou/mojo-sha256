@@ -75,7 +75,7 @@ struct Sha256[backend: Int = Backend.AUTO](Copyable, Movable):
     var h = Sha256()
     h.write(first)
     h.write(second)
-    var d = h.digest()          # InlineArray[UInt8, 32], no allocation
+    var d = h.digest()          # Array[UInt8, 32], no allocation
     ```
 
     A hasher is single-use: `digest()` applies the padding, so writing again
