@@ -68,7 +68,7 @@ def arm_backend_available() -> Bool:
     return CompilationTarget.is_apple_silicon()
 
 
-struct Sha256[backend: Int = Backend.AUTO](Copyable, Movable):
+struct Sha256[backend: Int = Backend.AUTO](Copyable):
     """Streaming SHA-256.
 
     ```mojo
@@ -89,9 +89,14 @@ struct Sha256[backend: Int = Backend.AUTO](Copyable, Movable):
 
     def __init__(out self):
         self.s = initial_state()
-        # Left uninitialized deliberately: nothing reads a byte of `buf` that
-        # write() or the padding in _finish() has not set first.
-        self.buf = Block(uninitialized=True)
+        # Zeroed rather than left uninitialized. Every byte is written before
+        # a block is compressed, so `uninitialized=True` computed the same
+        # digests -- but `Sha256` is `Copyable`, and copying reads all 64
+        # bytes, including any the caller has not written yet. Zeroing also
+        # keeps stale stack contents out of a hasher used for keyed
+        # constructions. Costs nothing measurable: the fill dies once `write()`
+        # overwrites the buffer, and the optimizer removes it.
+        self.buf = Block(fill=0)
         self.buf_len = 0
         self.total = 0
 
@@ -108,12 +113,12 @@ struct Sha256[backend: Int = Backend.AUTO](Copyable, Movable):
         self.total += UInt64(n)
         var i = 0
 
-        if self.buf_len != 0:
+        if self.buf_len != 0 and n != 0:
             var take = BLOCK_SIZE - self.buf_len
             if take > n:
                 take = n
             unsafe_memcpy(
-                dest=Pointer(to=self.buf[self.buf_len]),
+                dest=self.buf.unsafe_ptr().unsafe_offset(self.buf_len),
                 src=data.unsafe_ptr(),
                 count=take,
             )
@@ -125,7 +130,7 @@ struct Sha256[backend: Int = Backend.AUTO](Copyable, Movable):
 
         while n - i >= BLOCK_SIZE:
             unsafe_memcpy(
-                dest=Pointer(to=self.buf[0]),
+                dest=self.buf.unsafe_ptr(),
                 src=data.unsafe_ptr().unsafe_offset(i),
                 count=BLOCK_SIZE,
             )
@@ -135,7 +140,7 @@ struct Sha256[backend: Int = Backend.AUTO](Copyable, Movable):
         var rest = n - i
         if rest != 0:
             unsafe_memcpy(
-                dest=Pointer(to=self.buf[self.buf_len]),
+                dest=self.buf.unsafe_ptr().unsafe_offset(self.buf_len),
                 src=data.unsafe_ptr().unsafe_offset(i),
                 count=rest,
             )
@@ -169,9 +174,13 @@ struct Sha256[backend: Int = Backend.AUTO](Copyable, Movable):
         # The digest is the state in big-endian order: one vector byte-swap
         # and one store, rather than 32 shift-and-mask steps.
         var out = Digest(uninitialized=True)
-        Pointer(to=out[0]).unsafe_bitcast[UInt32]().unsafe_store[width=8](
-            0, byte_swap(self.s)
-        )
+        # `unsafe_ptr()`, not `Pointer(to=out[0])`: the latter addresses a
+        # single byte, and this store covers all 32. `alignment=1` because an
+        # `Array[UInt8, N]` is 1-byte aligned, while the store would otherwise
+        # promise `align_of[UInt32]()` == 4.
+        out.unsafe_ptr().unsafe_bitcast[UInt32]().unsafe_store[
+            width=8, alignment=1
+        ](byte_swap(self.s))
         return out^
 
     def hexdigest(mut self) -> String:

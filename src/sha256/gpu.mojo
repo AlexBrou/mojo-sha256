@@ -36,7 +36,8 @@ from max.gpu.host import DeviceBuffer, DeviceContext, HostBuffer
 from std.memory import unsafe_memcpy
 from std.gpu import global_idx
 
-from .constants import BLOCK_SIZE, DIGEST_SIZE, Block, initial_state
+from .constants import BLOCK_SIZE, DIGEST_SIZE, Block, Digest, initial_state
+from .core import _hex
 from .portable import compress
 
 comptime Bytes = Pointer[UInt8, MutAnyOrigin]
@@ -138,19 +139,15 @@ struct GpuHasher(Movable):
         Metal, leaving the output buffer zeroed. Without this you would read
         that as a digest of all zeros.
         """
-        var msg = List[UInt8]()
-        for c in String("abc").as_bytes():
-            msg.append(c)
-        var got = self.hash_batch(msg, 3, 1, check_size=False)
+        var msg = String("abc")
+        var got = self.hash_batch(msg.as_bytes(), 3, 1, check_size=False)
         comptime EXPECTED = (
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         )
-        var hexed = String()
-        comptime H = "0123456789abcdef"
+        var digest = Digest(fill=0)
         for i in range(DIGEST_SIZE):
-            hexed += H[byte=Int(got[i]) >> 4]
-            hexed += H[byte=Int(got[i]) & 0xF]
-        if hexed != EXPECTED:
+            digest[i] = got[i]
+        if _hex(digest) != EXPECTED:
             raise Error(
                 "GPU self-test failed: the kernel did not hash correctly."
                 " The launch configuration (block_size="
@@ -199,9 +196,14 @@ struct GpuHasher(Movable):
             )
         self.dev.enqueue_copy(dst_buf=self.d_in, src_buf=self.h_in)
 
+        # Pass the `DeviceBuffer`s, not `unsafe_ptr()`. A `DeviceBuffer` is
+        # `DevicePassable` and reaches the kernel as the same
+        # `Pointer[UInt8, MutAnyOrigin]`, but handing over the raw pointer
+        # drops the link the lifetime checker uses to keep the buffer alive
+        # across an asynchronous launch.
         self.dev.enqueue_function[kernel_hash_fixed](
-            self.d_in.unsafe_ptr(),
-            self.d_out.unsafe_ptr(),
+            self.d_in,
+            self.d_out,
             Int64(msg_len),
             Int64(count),
             grid_dim=(count + self.block_size - 1) // self.block_size,

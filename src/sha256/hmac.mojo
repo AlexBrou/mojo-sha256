@@ -5,7 +5,7 @@ from .core import Backend, Sha256, _hex
 from .scrub import scrub_u8
 
 
-struct HmacSha256[backend: Int = Backend.AUTO](Copyable, Movable):
+struct HmacSha256[backend: Int = Backend.AUTO](Copyable):
     """```mojo
     var h = HmacSha256(key)
     h.write(message)

@@ -10,7 +10,7 @@ from .hmac import HmacSha256
 from .scrub import scrub_u8
 
 
-struct Rfc6979[backend: Int = Backend.AUTO](Copyable, Movable):
+struct Rfc6979[backend: Int = Backend.AUTO](Copyable):
     """```mojo
     var rng = Rfc6979(seed)         # seed is usually seckey || message
     var nonce = rng.generate()      # 32 bytes, deterministic
