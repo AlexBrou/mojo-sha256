@@ -1,7 +1,6 @@
 """The SHA-256 hasher, and the backend selection behind it."""
 
 from std.bit import byte_swap
-from std.memory import unsafe_memcpy
 from std.sys.info import CompilationTarget
 
 from .constants import (
@@ -117,10 +116,8 @@ struct Sha256[backend: Int = Backend.AUTO](Copyable):
             var take = BLOCK_SIZE - self.buf_len
             if take > n:
                 take = n
-            unsafe_memcpy(
-                dest=self.buf.unsafe_ptr().unsafe_offset(self.buf_len),
-                src=data.unsafe_ptr(),
-                count=take,
+            Span(self.buf)[self.buf_len : self.buf_len + take].copy_from(
+                data[0:take]
             )
             self.buf_len += take
             i = take
@@ -129,20 +126,14 @@ struct Sha256[backend: Int = Backend.AUTO](Copyable):
                 self.buf_len = 0
 
         while n - i >= BLOCK_SIZE:
-            unsafe_memcpy(
-                dest=self.buf.unsafe_ptr(),
-                src=data.unsafe_ptr().unsafe_offset(i),
-                count=BLOCK_SIZE,
-            )
+            Span(self.buf).copy_from(data[i : i + BLOCK_SIZE])
             self._compress()
             i += BLOCK_SIZE
 
         var rest = n - i
         if rest != 0:
-            unsafe_memcpy(
-                dest=self.buf.unsafe_ptr().unsafe_offset(self.buf_len),
-                src=data.unsafe_ptr().unsafe_offset(i),
-                count=rest,
+            Span(self.buf)[self.buf_len : self.buf_len + rest].copy_from(
+                data[i : i + rest]
             )
             self.buf_len += rest
 
